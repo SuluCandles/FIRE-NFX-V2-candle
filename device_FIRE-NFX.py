@@ -305,7 +305,7 @@ def OnMidiIn(event):
             event.handled = HandleMacros(pdMacros.index(padNum))
             RefreshMacros()
             return 
-        
+
         # always handle macros
         if(padNum in pdNav) and (pMap.Pressed): 
             event.handled = HandleNav(padNum)
@@ -527,7 +527,7 @@ def HandlePads(event, padNum, pMap):
                     event.handled = HandleChannelStrip(padNum, False)   
             elif(padNum in pdChanStripB):
                 event.handled = HandleChannelStrip(padNum, True)
-    
+
 
     return True
 def HandleNav(padIdx):
@@ -760,7 +760,6 @@ def HandleDrums(event, padNum):
         return True 
     else:
         return True # mark as handled to prevent processing
-   
 def HandlePatternStripA(padNum):
     #pattIdx = pdPatternStripA.index(padNum)
     #patt = _PatternMap[pattIdx]
