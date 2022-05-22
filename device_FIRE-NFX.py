@@ -305,7 +305,7 @@ def OnMidiIn(event):
             event.handled = HandleMacros(pdMacros.index(padNum))
             RefreshMacros()
             return 
-
+        
         # always handle macros
         if(padNum in pdNav) and (pMap.Pressed): 
             event.handled = HandleNav(padNum)
@@ -527,7 +527,7 @@ def HandlePads(event, padNum, pMap):
                     event.handled = HandleChannelStrip(padNum, False)   
             elif(padNum in pdChanStripB):
                 event.handled = HandleChannelStrip(padNum, True)
-
+    
 
     return True
 def HandleNav(padIdx):
@@ -760,6 +760,7 @@ def HandleDrums(event, padNum):
         return True 
     else:
         return True # mark as handled to prevent processing
+   
 def HandlePatternStripA(padNum):
     #pattIdx = pdPatternStripA.index(padNum)
     #patt = _PatternMap[pattIdx]
@@ -1062,21 +1063,49 @@ def HandleSelectWheel(event, ctrlID):
     global _menuItemSelected
     global _selectedItem
 
-    prn(lvlA, 'HandleSelectWheel', ctrlID, event.data1, event.data2) 
-    ShowMenuItems()
+    prn(lvlA, 'HandleSelectWheel', ctrlID, event.data1, event.data2)
     jogNext = 1
     jogPrev = 127
-    if(ctrlID == IDSelect):
-        if(event.data2 == jogNext) and (_menuItemSelected < (len(_menuItems)-1) ):
-            #prn(lvlA, 'mi', _menuItemSelected, '->', _menuItemSelected + 1 )
-            _menuItemSelected += 1
-        elif(event.data2 == jogPrev) and (_menuItemSelected > 0):
-            _menuItemSelected += -1
-        ShowMenuItems()
-        return True 
-    if(ctrlID == IDSelectDown):
-        _selectedItem = _menuItemSelected
-        return True 
+    if(_KnobMode == UM_MIXER):
+        ShowMixerInserts()
+        if ctrlID == IDSelect:
+            if(event.data2 == jogNext):
+                transport.globalTransport(FPT_MixerWindowJog, 1)
+                _menuItemSelected +- 1   
+            elif(event.data2 == jogPrev):
+                _menuItemSelected += -1
+                transport.globalTransport(FPT_MixerWindowJog, -1)
+            ShowMixerInserts()    
+            return True
+        if(ctrlID == IDSelectDown):
+            prn(lvlA, 'here', _menuItemSelected)
+            mixer.enableTrackSlots(1, -1)
+            ShowMixerInserts()
+            return True
+
+    if(_KnobMode == UM_CHANNEL):
+        _menuItemSelected = mixer.trackNumber()
+        GetMixerTracks()
+        if(ctrlID == IDSelect):
+            if(event.data2 == jogNext) and (_menuItemSelected < (mixer.trackCount()-1)):
+                _menuItemSelected += 1
+                transport.globalTransport(FPT_TrackJog, 1)
+            elif(event.data2 == jogPrev) and (_menuItemSelected > 0):
+                _menuItemSelected += -1
+                transport.globalTransport(FPT_TrackJog, -1)
+            GetMixerTracks()
+            return True 
+        if(ctrlID == IDSelectDown):
+            _selectedItem = _menuItemSelected
+            if(_AltHeld):
+                mixer.muteTrack(_selectedItem)    
+            elif(_ShiftHeld):
+                mixer.linkTrackToChannel(ROUTE_ToThis)
+            else:    
+                mixer.soloTrack(_selectedItem)
+            GetMixerTracks()
+            return True
+
 def HandleBrowserButton():
     #global _ShowBrowser
     # using to trigger the menu for now
@@ -1085,13 +1114,10 @@ def HandleBrowserButton():
     global _menuItemSelected
 
     _ShowMenu = not _ShowMenu
-    prn(lvlA, 'Browser (MENU)', _ShowMenu, _menuItems[0], plugins.getName(_CurrentChannel))
+    #prn(lvlA, 'Browser (MENU)', _ShowMenu, _menuItems[0], plugins.getName(_CurrentChannel))
     if(_ShowMenu):
         SendCC(IDBrowser, SingleColorHalfBright) 
-        if( plugins.getPluginName(_CurrentChannel) == 'Strum GS-2'):
-            prn(lvlA, 'Strum GS-2')
-            _menuItems = ['Keyboard', 'Guitar', 'Loop']
-            _menuItemSelected = 0
+        _menuItemSelected = 0
         ShowMenuItems()
     else:
         SendCC(IDBrowser, SingleColorOff) 
@@ -1189,6 +1215,8 @@ def HandleUDLR(padIndex):
         ui.escape()
     elif(padIndex == pdEnter):
         ui.enter()
+    elif(padIndex == pdTab):
+        ui.selectWindow(_ShiftHeld)    
     else:
         return False 
     return True
@@ -1717,6 +1745,9 @@ def RefreshDisplay():
 
     prn(lvlA, "RefreshDisplay()")
     _menuItemSelected = _selectedItem # reset this for the next menu
+    if(_KnobMode == UM_MIXER and ui.getFocused(widMixer)):
+        ShowMixerInserts()
+        return
     chanIdx = getCurrChanIdx() # 
     chanName = channels.getChannelName(chanIdx)
     mixerName = mixer.getTrackName(mixer.trackNumber())
@@ -1763,6 +1794,8 @@ def RefreshUDLR():
             SetPadColor(pad, cRed, dimDefault)
         elif(pad == pdEnter):
             SetPadColor(pad, cGreen, dimDefault)
+        elif(pad == pdTab):
+            SetPadColor(pad, cBlue, dimDefault)    
         else:
             SetPadColor(pad, cDimWhite, dimDefault)
 
@@ -2314,6 +2347,7 @@ def ShowPlaylist(showVal, bUpdateDisplay = False):
 
 def ShowMixer(showVal, bUpdateDisplay = False):
     global _ShowMixer
+    global _KnobMode
 
     isShowing = ui.getVisible(widMixer)
     isFocused = ui.getFocused(widMixer)
@@ -2332,7 +2366,9 @@ def ShowMixer(showVal, bUpdateDisplay = False):
         ui.hideWindow(widMixer)
 
     _ShowMixer = showVal    
-
+    if(_KnobMode == UM_MIXER):
+        ShowMixerInserts()
+        return
     if(bUpdateDisplay): 
         DisplayTimedText('Mixer: ' + _showText[showVal])
 
@@ -2424,6 +2460,31 @@ def ShowMenuItems():
 
     DisplayTextAll(displayText[0], displayText[1], displayText[2])
 #endregion
+
+def GetMixerTracks():
+    pageLen = 3 # display is 3 lines tall
+    selPage = int(_menuItemSelected/pageLen) # 
+    selItemOffs = _menuItemSelected % pageLen    #
+    pageFirstItemOffs = (selPage * pageLen)       # 
+    maxItem = mixer.trackCount()
+    displayText = ['','','']
+    for i in range(0,3):
+        item = i + pageFirstItemOffs
+        if(item < maxItem):
+            preText = ''
+            if(_menuItemSelected == item):
+                preText = '-->'
+            displayText[i] = preText + mixer.getTrackName(item)
+            prn(lvlA, displayText[i], _menuItemSelected)
+
+    DisplayTextAll(displayText[0], displayText[1], displayText[2])
+
+def ShowMixerInserts():
+    displayText = ['','','']
+    displayText[0] = mixer.getTrackName(mixer.trackNumber())
+    displayText[1] = '----------------'
+    displayText[2] = ui.getFocusedPluginName()
+    DisplayTextAll(displayText[0], displayText[1], displayText[2])
 
 # work area/utility        
 def prn(lvl, *objects):

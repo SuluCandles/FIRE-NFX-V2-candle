@@ -17,8 +17,8 @@ pdPlaylistStripB = [ 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43]     # third
 pdPlaylistMutesB = [ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59]     # fourth row, first 12
 
 
-pdProgress = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63] 
-pdMarkers  = [ 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]
+pdProgress = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59]#, 60, 61, 62, 63] fixes navigation
+pdMarkers  = [ 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43]#, 44, 45, 46, 47] fixes navigation
 
 # these are defined in "FPC" order. Bottom Left FPC Pad is first value in index
 # so I define them bottom to top order for each set.
@@ -64,7 +64,8 @@ pdEnter = 46
 pdLeft = 60
 pdDown = 61
 pdRight = 62
-pdUDLR = [pdEsc, pdUp, pdEnter, pdLeft, pdDown, pdRight]
+pdTab = 63
+pdUDLR = [pdEsc, pdUp, pdEnter, pdLeft, pdDown, pdRight, pdTab]
 
 # for modes that need channel specific window control - ie Note mode, FPC, etc
 pdShowChanEditor = 44
